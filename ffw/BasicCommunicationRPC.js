@@ -379,6 +379,9 @@ FFW.BasicCommunication = FFW.RPCObserver
           if (request.method == 'BasicCommunication.AllowDeviceToConnect') {
             this.AllowDeviceToConnect(request.id, request.method, true);
           }
+          if (request.method == 'BasicCommunication.GetSystemTime') {
+            this.GetSystemTime(request.id, request.method);
+          }
           if (request.method == 'BasicCommunication.UpdateDeviceList') {
             SDL.SDLModel.onGetDeviceList(request.params);
             this.sendBCResult(
@@ -729,6 +732,45 @@ FFW.BasicCommunication = FFW.RPCObserver
         this.client.send(JSONMessage);
       },
       /**
+       * Response with current system UTC time
+       *
+       * @param {Number}
+       *            id
+       * @param {String}
+       *            method
+       */
+      GetSystemTime : function(id, method) {
+        Em.Logger.log('FFW.' + method + ' Response');
+
+        var current_time = new Date;
+        var system_time_utc = {
+          'second' : current_time.getUTCSeconds(),
+          'minute' : current_time.getUTCMinutes(),
+          'hour' : current_time.getUTCHours(),
+          'day' : current_time.getUTCDate(),
+          // According to APPLINK-21928 month should be in range 1..12
+          'month' : current_time.getUTCMonth() + 1,
+          'year' : current_time.getUTCFullYear(),
+
+          // According to APPLINK-33109 fields below should be set to 0
+          'millisecond' : 0,
+          'tz_hour' : 0,
+          'tz_minute' : 0
+        };
+
+        // Send repsonse
+        var JSONMessage = {
+          'jsonrpc' : '2.0',
+          'id' : id,
+          'result' : {
+            'code' : SDL.SDLModel.data.resultCode.SUCCESS,
+            'method' : method,
+            'systemTime' : system_time_utc
+          }
+        };
+        this.client.send(JSONMessage);
+      },
+      /**
        * Response with params of the last one supports mixing audio (ie
        * recording TTS command and playing audio).
        *
@@ -798,6 +840,7 @@ FFW.BasicCommunication = FFW.RPCObserver
         };
         this.client.send(JSONMessage);
       },
+
       /********************* Responses end *********************/
 
       /********************* Notifications BEGIN *********************/
@@ -866,7 +909,7 @@ FFW.BasicCommunication = FFW.RPCObserver
        * @param {String} source
        * @param {String} appID
        */
-      OnAppPermissionConsent: function(consentedFunctions, ccsStatus, source, appID) {
+      OnAppPermissionConsent: function(consentedFunctions, externalConsentStatus, source, appID) {
         Em.Logger.log('FFW.SDL.OnAppPermissionConsent');
         // send repsonse
         var JSONMessage = {
@@ -880,8 +923,8 @@ FFW.BasicCommunication = FFW.RPCObserver
         if (consentedFunctions.length > 0) {
           JSONMessage.params.consented_functions = consentedFunctions; 
         }
-        if (ccsStatus.length > 0) {
-          JSONMessage.params.ccs_status = ccsStatus; 
+        if (externalConsentStatus.length > 0) {
+          JSONMessage.params.external_consent_status = externalConsentStatus; 
         }
         if (appID) {
           JSONMessage.params.appID = appID;
@@ -889,7 +932,7 @@ FFW.BasicCommunication = FFW.RPCObserver
         this.client.send(JSONMessage);
       },
       /**
-       * notification that UI is ready BasicCommunication should be sunscribed
+       * notification that UI is ready BasicCommunication should be subscribed
        * to this notification
        */
       onReady: function() {
@@ -897,6 +940,18 @@ FFW.BasicCommunication = FFW.RPCObserver
         var JSONMessage = {
           'jsonrpc': '2.0',
           'method': 'BasicCommunication.OnReady'
+        };
+        this.client.send(JSONMessage);
+      },
+      /**
+       * notify SDL about readiness to provide system time.
+       * BasicCommunication should be subscribed to this notification
+       */
+      onSystemTimeReady : function() {
+        Em.Logger.log('FFW.BasicCommunication.onSystemTimeReady');
+        var JSONMessage = {
+          'jsonrpc' : '2.0',
+          'method' : 'BasicCommunication.OnSystemTimeReady'
         };
         this.client.send(JSONMessage);
       },
